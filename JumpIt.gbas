@@ -1,0 +1,563 @@
+// --------------------------------- //
+// Project: JumpIt
+// Start: Sunday, September 25, 2011
+// IDE Version: 10.118
+
+// viele Level
+// Einspieler Modus
+// 4 Gegnertypen
+// Pixelgrafik (Paint.NET)
+// Levelwechsel
+// Leiter
+// Stacheln
+// Startpunkt
+// Trampolin
+// Mapeditor
+// Bomben + Schalter
+
+//Gegner
+// 1) Schwein (geht)
+// 2) Vogel (fliegt, kackt)
+// 3) Fetter Mensch (der rollt/überrollt)
+// 4) Llama (spuckt)
+
+
+SYSTEMPOINTER TRUE
+LIMITFPS 30
+GLOBAL Hardware$ = PLATFORMINFO$("DEVICE")
+LOCAL dx%, dy%
+GETDESKTOPSIZE dx, dy
+
+IF Hardware$ = "DESKTOP"
+	dx = 800
+	dy = 600
+ENDIF
+
+SETSCREEN dx, dy, FALSE
+IF dx < dy
+	IF Hardware$ <> "DESKTOP" OR Hardware$ = "WIZ"
+		SETORIENTATION 1
+	ENDIF
+ENDIF
+
+SETCURRENTDIR("Media") // go to media files
+
+CONSTANT STATE_IS_GAME = 0
+CONSTANT STATE_IS_EDIT = 1
+
+GLOBAL Gamestate% = STATE_IS_GAME
+GLOBAL EditorEnemy AS TEnemy
+GLOBAL SelectTile% = 0
+GLOBAL MouseX, MouseY, ML, MR
+
+LOADFONT "smalfont.png", 0
+LOADFONT "smalfont2.png", 1
+SETFONT 0
+
+GLOBAL PlayerImage%
+PlayerImage = GENSPRITE()
+LOADANIM "spieler.png", PlayerImage, 16, 32
+
+//GLOBAL BGImage%
+//BGImage = GENSPRITE()
+//LOADSPRITE "bg.png", BGImage
+
+GLOBAL LadderImage%
+LadderImage = GENSPRITE()
+LOADSPRITE "leiter.png", LadderImage
+
+GLOBAL HeartImage%
+HeartImage = GENSPRITE()
+LOADSPRITE "herz.png", HeartImage
+
+GLOBAL SpikeImage%
+SpikeImage = GENSPRITE()
+LOADSPRITE "stachel.png", SpikeImage
+
+GLOBAL TrampolineImage%
+TrampolineImage = GENSPRITE()
+LOADSPRITE "trampolin.png", TrampolineImage
+
+GLOBAL PigImage%
+PigImage = GENSPRITE()
+LOADANIM "schwein.png", PigImage, 32, 32
+
+GLOBAL HumanImage%
+HumanImage = GENSPRITE()
+LOADSPRITE "fettmonster.png", HumanImage
+
+GLOBAL BirdImage%
+BirdImage = GENSPRITE()
+LOADANIM "vogel.png", BirdImage, 32, 16
+
+GLOBAL ShitImage%
+ShitImage = GENSPRITE()
+LOADSPRITE "exkrement.png", ShitImage
+
+GLOBAL LlamaImage%
+LlamaImage = GENSPRITE()
+LOADANIM "llama.png", LlamaImage, 46, 64
+
+GLOBAL SpitImage%
+SpitImage = GENSPRITE()
+LOADSPRITE "spucke.png", SpitImage
+
+GLOBAL DoorImage%
+DoorImage = GENSPRITE()
+LOADSPRITE "tuer.png", DoorImage
+
+GLOBAL TriggerImage%
+TriggerImage = GENSPRITE()
+LOADANIM "schalter.png", TriggerImage, 32, 16
+
+GLOBAL DynamitImage%
+DynamitImage = GENSPRITE()
+LOADSPRITE "dynamit.png", DynamitImage
+
+GLOBAL ExplosionImage%
+ExplosionImage = GENSPRITE()
+LOADANIM "explosion.png", ExplosionImage, 32, 32
+
+GLOBAL MenuImage%
+MenuImage = GENSPRITE()
+LOADSPRITE "menu.png", MenuImage
+
+GLOBAL ButtonImage%
+ButtonImage = GENSPRITE()
+LOADSPRITE "button.png", ButtonImage
+
+GLOBAL ArrowImage%
+ArrowImage = GENSPRITE()
+LOADSPRITE "pfeil.png", ArrowImage
+
+GLOBAL JumpImage%
+JumpImage = GENSPRITE()
+LOADSPRITE "springen.png", JumpImage
+
+
+GLOBAL Player AS TPlayer //"erstellt" den Spieler.
+GLOBAL Map AS TMap
+
+CLEARSCREEN RGB(63,156,255)
+
+GOSUB Init
+LOCAL Action% = Menu("JumpIt Spielmenü", "Spielen", "Mapeditor", "Beenden")
+SELECT Action
+	CASE 1
+		Gamestate = STATE_IS_GAME
+	CASE 2
+		Gamestate = STATE_IS_EDIT
+	CASE 3
+		END
+ENDSELECT
+
+GLOBAL LastMousePosition%[]
+
+
+GOSUB Init
+WHILE TRUE
+
+	GOSUB Update
+	GOSUB Update
+	GOSUB Render
+
+
+	SHOWSCREEN
+WEND
+
+
+
+
+SUB Update:
+	MOUSESTATE MouseX, MouseY, ML, MR
+
+	SELECT Gamestate
+		CASE STATE_IS_GAME
+			Map.Update()
+			FOREACH Enemy IN Enemys[]
+				Enemy.Update()
+			NEXT
+			FOREACH Shit IN Shits[]
+				Shit.Update()
+				IF Shit.Del THEN DELETE Shit
+			NEXT
+			FOREACH Spit IN Spits[]
+				Spit.Update()
+				IF Spit.Del THEN DELETE Spit
+			NEXT
+			FOREACH Explosion IN Explosions[]
+				Explosion.Update()
+				IF Explosion.Del THEN DELETE Explosion
+			NEXT
+			Player.Update()
+		CASE STATE_IS_EDIT
+//			IF GETMOUSECOUNT() > 2
+//				//wenn zwei Mäuse erkannt wurden!
+//				REDIM LastMousePosition[GETMOUSECOUNT()*2]
+//
+//
+//
+//				LOCAL NotChange% = FALSE
+//				FOR i = 0 TO GETMOUSECOUNT() -1
+//					SETACTIVEMOUSE i
+//					LOCAL mx, my, ml, mr
+//
+//					MOUSESTATE mx, my, ml, mr
+//
+//					IF LastMousePosition[i*2] = 0 THEN LastMousePosition[i*2] = mx
+//					IF LastMousePosition[i*2 + 1] = 0 THEN LastMousePosition[i*2 + 1] = my
+//
+//					IF NotChange = FALSE
+//						Map.ScrollX = Map.ScrollX - (mx - LastMousePosition[i*2])
+//						Map.ScrollY = Map.ScrollY - (my - LastMousePosition[i*2+1])
+//					ENDIF
+//
+//					IF (mx - LastMousePosition[i*2]) <> 0 OR (mx - LastMousePosition[i*2 + 1])<>0
+//						NotChange = TRUE
+//					ENDIF
+//
+//					LastMousePosition[i*2] = mx
+//					LastMousePosition[i*2 + 1] = my
+//				NEXT
+//
+//				ML = FALSE
+//				MR = FALSE
+//				SETACTIVEMOUSE 0
+//			ENDIF
+
+
+			SELECT TRUE
+				CASE DDgui_get("tilepicker", "CLICKED")
+					SELECT DDgui_getitemtext$("tilepicker", DDgui_get("tilepicker", "SELECT"))
+						CASE "Leer"
+							SelectTile = 0
+						CASE "Solide"
+							SelectTile = 1
+						CASE "Trampolin"
+							SelectTile = 5
+						CASE "Leiter"
+							SelectTile = 2
+						CASE "Vogel"
+							SelectTile = 8
+							EditorEnemy.Init(IS_BIRD, 0, 0)
+						CASE "Schwein"
+							SelectTile = 6
+							EditorEnemy.Init(IS_PIG, 0, 0)
+						CASE "Lama"
+							SelectTile = 9
+							EditorEnemy.Init(IS_LLAMA, 0, 0)
+						CASE "Fettie"
+							SelectTile = 7
+							EditorEnemy.Init(IS_HUMAN, 0, 0)
+						CASE "Teleporter"
+							SelectTile = 10
+						CASE "Stachel"
+							SelectTile = 3
+						CASE "Starter"
+							SelectTile = 4
+						CASE "Dynamit"
+							SelectTile = 11
+						CASE "Schalter"
+							SelectTile = 12
+					ENDSELECT
+					IF IsEnemy()
+						DIMDEL Enemys[], -1
+					ENDIF
+				CASE DDgui_get("save", "CLICKED")
+					Map.NextMap$ = DDgui_get$("nextmap", "TEXT")
+					LOCAL File$ = DDgui_FileDialog$(FALSE, "*.map")
+					IF INSTR(File$, ".map") = -1 THEN File$ = File$ + ".map"
+					Map.Save(File$)
+				CASE DDgui_get("load", "CLICKED")
+					Map.Init(DDgui_FileDialog$(TRUE,"*.map"))
+					DDgui_set("nextmap", "TEXT", Map.NextMap$)
+					Map.Datas[Map.SpawnX/Tilesize][Map.SpawnY/Tilesize] = 4
+				CASE DDgui_get("new", "CLICKED")
+					GOSUB CreateMap
+			ENDSELECT
+
+
+			IF BOXCOLL(DDgui_get("", "XPOS"), DDgui_get("", "YPOS"), DDgui_get("", "WIDTH"), DDgui_get("", "HEIGHT"), MouseX, MouseY, 1, 1) = FALSE
+				LOCAL X = INTEGER((MouseX - Map.ScrollX)/Tilesize)
+				LOCAL Y = INTEGER((MouseY - Map.ScrollY)/Tilesize)
+				IF MR
+					FOREACH Enem IN Enemys[]
+						IF BOXCOLL(Enem.X, Enem.Y, Enem.Width, Enem.Height, X*Tilesize, Y*Tilesize, Tilesize, Tilesize) THEN DELETE Enem
+					NEXT
+				ENDIF
+
+				IF ML AND X >= 0 AND Y >= 0 AND X <Map.Width AND Y <Map.Height
+					IF IsEnemy()
+						LOCAL enem AS TEnemy
+						enem = EditorEnemy
+						DIMPUSH Enemys[], enem
+
+						SelectTile = 0
+					ELSE
+						Map.Datas[X][Y] = SelectTile
+					ENDIF
+				ENDIF
+			ENDIF
+
+
+			INC Map.ScrollX, (KEY(203) - KEY(205))*4
+			INC Map.ScrollY, (KEY(200) - KEY(208))*4
+	ENDSELECT
+ENDSUB
+
+
+SUB Render:
+	LOCAL Width, Height
+	GETSCREENSIZE Width, Height
+//	LOCAL SprWidth, SprHeight
+//	GETSPRITESIZE BGImage, SprWidth, SprHeight
+//	STARTPOLY BGImage, 0
+//	POLYVECTOR 0		,0		,0,0,RGB(255,255,255)
+//	POLYVECTOR Width	,0		,SprWidth,0,RGB(255,255,255)
+//	POLYVECTOR Width	,Height	,SprWidth,SprHeight,RGB(255,255,255)
+//	POLYVECTOR 0		,Height	,0,SprHeight,RGB(255,255,255)
+//	ENDPOLY
+
+	SELECT Gamestate
+		CASE STATE_IS_GAME
+			FOREACH Shit IN Shits[]
+				Shit.Render()
+			NEXT
+
+			Map.Render()
+
+			FOREACH Spit IN Spits[]
+				Spit.Render()
+			NEXT
+
+			FOREACH Enemy IN Enemys[]
+				Enemy.Render()
+			NEXT
+
+			FOREACH Explosion IN Explosions[]
+				Explosion.Render()
+			NEXT
+
+			Player.Render()
+
+			IF Hardware$
+				GameButton(42,Height - 42, "<")
+				GameButton(Width - 42,Height - 42, ">")
+				GameButton(42, Height - 125, "jump")
+				GameButton(Width - 42, Height - 125, "jump")
+			ENDIF
+		CASE STATE_IS_EDIT
+			FOR x = 0 TO Map.Width*Tilesize STEP Tilesize
+				DRAWLINE x+Map.ScrollX,0+Map.ScrollY,x+Map.ScrollX,Map.Height*Tilesize+Map.ScrollY,RGB(255,255,255)
+			NEXT
+			FOR y = 0 TO Map.Height*Tilesize STEP Tilesize
+				DRAWLINE 0+Map.ScrollX,y+Map.ScrollY,Map.Width*Tilesize+Map.ScrollX,y+Map.ScrollY,RGB(255,255,255)
+			NEXT
+
+			Map.Render()
+
+			FOREACH Enemy IN Enemys[]
+				Enemy.Render()
+			NEXT
+
+			LOCAL X = INTEGER((MouseX - Map.ScrollX)/Tilesize)
+			LOCAL Y = INTEGER((MouseY - Map.ScrollY)/Tilesize)
+			IF IsEnemy()
+				EditorEnemy.X = X *Tilesize
+				EditorEnemy.Y = Y *Tilesize
+				EditorEnemy.Render()
+			ELSE
+				Map.RenderTile(SelectTile, X, Y, FALSE)
+			ENDIF
+
+			DDgui_show(FALSE)
+	ENDSELECT
+ENDSUB
+
+
+SUB Init:
+	LOCAL Width, Height
+	GETSCREENSIZE Width, Height
+	SELECT Gamestate
+		CASE STATE_IS_GAME
+			Player.Init(100,100)
+			Map.Init("map0.map")
+		CASE STATE_IS_EDIT
+			DDgui_init()
+
+			DDgui_pushdialog(Width-140,0,140,Height)
+
+			GOSUB CreateMap
+
+
+			DDgui_framestart("", "Tile Auswählen: ")
+				DDgui_list("tilepicker", "Leer|Solide|Trampolin|Leiter|Vogel|Schwein|Lama|Fettie|Teleporter|Stachel|Starter|Dynamit|Schalter",130,230)
+			DDgui_frameend()
+
+			DDgui_framestart("", "Nächste Map: ")
+				DDgui_text("nextmap","", 120,0)
+			DDgui_frameend()
+
+			DDgui_framestart("", "Datei...")
+				DDgui_button("save", "...Speichern",130)
+				DDgui_button("load", "...Laden",130)
+				DDgui_button("new", "...Neu",130)
+			DDgui_frameend()
+	ENDSELECT
+
+	DIM LastMousePosition[0]
+ENDSUB
+
+
+SUB CreateMap:
+	LOCAL Width, Height
+	GETSCREENSIZE Width, Height
+	DDgui_pushdialog(0,0,Width, Height)
+	DDgui_framestart("", "Breite")
+		DDgui_text("breitetext",20)
+		DDgui_slider("breiteslide",20, Width/3*2)
+		DDgui_set("breiteslide", "MINVAL",10)
+		DDgui_set("breiteslide", "MAXVAL",160)
+		DDgui_set("breiteslide", "STEP", 1)
+		DDgui_automate("breiteslide", "TEXT", "breitetext", "TEXT")
+	DDgui_frameend()
+
+	DDgui_framestart("", "Höhe")
+		DDgui_text("hoehetext",20)
+		DDgui_slider("hoeheslide",20, Width/3*2)
+		DDgui_set("hoeheslide", "MINVAL",10)
+		DDgui_set("hoeheslide", "MAXVAL",160)
+		DDgui_set("hoeheslide", "STEP", 1)
+		DDgui_automate("hoeheslide", "TEXT", "hoehetext", "TEXT")
+	DDgui_frameend()
+
+	DDgui_framestart("", "Tileset")
+		DDgui_combo("tileset","tileset1.png|snowtileset.png",Width/3*2)
+	DDgui_frameend()
+
+	DDgui_spacer()
+
+	DDgui_framestart("", "Aktion")
+		DDgui_button("erstellen", "Erstellen")
+		DDgui_button("abbrechen", "Abbrechen")
+	DDgui_frameend()
+
+	WHILE TRUE
+
+		SELECT TRUE
+			CASE DDgui_get("erstellen", "CLICKED")
+				Map.InitEmpty(DDgui_get("breiteslide", "TEXT"), DDgui_get("hoeheslide", "TEXT"), DDgui_getitemtext$("tileset",-1))
+
+				BREAK
+			CASE DDgui_get("abbrechen", "CLICKED")
+				BREAK
+		ENDSELECT
+
+		DDgui_show(TRUE)
+		SHOWSCREEN
+	WEND
+
+	DDgui_popdialog()
+
+	DIM LastMousePosition[0]
+ENDSUB
+
+FUNCTION IsEnemy%:
+	IF SelectTile = 8 OR SelectTile = 6 OR SelectTile = 9 OR SelectTile = 7
+		RETURN TRUE
+	ELSE
+		RETURN FALSE
+	ENDIF
+ENDFUNCTION
+
+
+FUNCTION Menu%: Title$, Menu1$, Menu2$, Menu3$ = ""
+	SETFONT 1
+
+	LOCAL x,y
+	GETFONTSIZE x,y
+	LOCAL w, h
+	GETSCREENSIZE w, h
+	LOCAL iw, ih
+	GETSPRITESIZE MenuImage, iw, ih
+
+
+	LOCAL hh = h-150
+
+	LOCAL Action% = 0
+	WHILE TRUE
+		MOUSESTATE MouseX, MouseY, ML, MR
+		Render()
+		STRETCHSPRITE MenuImage, w - LEN(Title$, TRUE), 40 - 32, -w - LEN(Title$, TRUE), ih
+		PRINT Title$, 20,40-y/2
+
+		IF Button(Menu1$, hh/3+100) THEN Action = 1
+		IF Button(Menu2$, hh/3*2+100) THEN Action = 2
+		IF Menu3$ <> "" THEN IF Button(Menu3$, hh+100) THEN Action = 3
+
+		IF Action THEN BREAK
+
+		SHOWSCREEN
+	WEND
+	SETFONT 0
+	RETURN Action
+ENDFUNCTION
+
+FUNCTION Button%: Text$, Y
+	LOCAL x,y
+	GETFONTSIZE x,y
+	LOCAL w, h
+	GETSCREENSIZE w, h
+	LOCAL iw, ih
+	GETSPRITESIZE MenuImage, iw, ih
+
+	IF BOXCOLL(0, Y - 32, w, ih, MouseX, MouseY, 1, 1)
+		ALPHAMODE 0
+		IF ML
+			RETURN TRUE
+		ENDIF
+	ELSE
+		ALPHAMODE -.75
+	ENDIF
+	STRETCHSPRITE MenuImage, 0, Y-32, w, ih
+	ALPHAMODE 0
+
+	PRINT Text$, 40, Y-y/2
+
+	RETURN FALSE
+ENDFUNCTION
+
+
+FUNCTION GameButton%: X, Y, Text$
+	IF UpdateGameButton(X, Y)
+		ALPHAMODE .5
+	ELSE
+		ALPHAMODE -0.5
+	ENDIF
+
+	DRAWSPRITE ButtonImage, X - 32, Y - 32
+	SELECT Text$
+		CASE "<"
+			DRAWSPRITE ArrowImage, X - 32, Y - 32
+		CASE ">"
+			ZOOMSPRITE ArrowImage, X - 32, Y - 32, -1, 1
+		CASE "jump"
+			DRAWSPRITE JumpImage, X- 32, Y -32
+	ENDSELECT
+
+	ALPHAMODE 0
+ENDFUNCTION
+
+FUNCTION UpdateGameButton: X, Y
+	LOCAL MX, MY, ML, MR
+	FOR i = 0 TO GETMOUSECOUNT()-1
+		SETACTIVEMOUSE i
+		MOUSESTATE MX, MY, ML, MR
+		IF BOXCOLL(X-32, Y-32, 64, 64, MX, MY, 1, 1) AND ML
+			SETACTIVEMOUSE 0
+			RETURN TRUE
+		ENDIF
+	NEXT
+	SETACTIVEMOUSE 0
+	RETURN FALSE
+ENDFUNCTION

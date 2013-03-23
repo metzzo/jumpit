@@ -1,0 +1,70 @@
+// --------------------------------- //
+// Project: qmath - quick math approximations
+// Start: Thursday, March 15, 2007
+// IDE Version: 4.126
+
+
+
+// Qedo http://www.glbasic.com/forum/index.php?topic=6446
+FUNCTION QSIN: x
+    WHILE x>360.0;  DEC x, 360.0; WEND
+    WHILE x<0;      INC x, 360.0; WEND
+
+    IF x>180.0 THEN x = 180.0-x
+
+	IF x>0
+		x = (0.022221532036391804173392430864397 - 0.00012345295575773224540773572702443 * x) * x
+		x = 0.225*(x*x-x)+x
+	ELSE
+		x = (0.022221532036391804173392430864397 + 0.00012345295575773224540773572702443 * x) * x
+		x = 0.225*(-x*x-x)+x
+	ENDIF
+	RETURN x
+ENDFUNCTION
+
+
+?IF 0 // original GF
+	FUNCTION QSIN: x
+	    WHILE x>360.0;  DEC x, 360.0; WEND
+	    WHILE x<0;      INC x, 360.0; WEND
+	    IF x>180.0 THEN x = 180.0-x
+	
+	    x = x/57.296
+	    x = 1.2732 * x -0.4053 * x * ABS(x)
+	
+		x = 0.225*(x*ABS(x)-x)+x
+		RETURN x
+	ENDFUNCTION
+?ENDIF
+
+FUNCTION QCOS: x
+	RETURN QSIN(x+90)
+ENDFUNCTION
+
+
+INLINE
+float qInvSqrt(float x){
+   float xhalf = 0.5f * x;
+   int i = *(int*)&x; // store floating-point bits in integer
+   i = 0x5f3759d5 - (i >> 1); // initial guess for Newton's method
+   x = *(float*)&i; // convert new bits into float
+   x = x*(1.5f - xhalf*x*x); // One round of Newton's method
+   return x;
+}
+ENDINLINE
+
+
+FUNCTION QSQR: y
+
+?IFDEF WEBOS // does not work with soft floats?
+	RETURN SQR(y)
+?ENDIF
+
+INLINE
+	return 1.0f / qInvSqrt(y);
+ENDINLINE
+ENDFUNCTION
+
+
+
+
